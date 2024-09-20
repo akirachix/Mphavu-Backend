@@ -2,11 +2,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response 
 from rest_framework import status 
 import os
+from django.shortcuts import get_object_or_404
 from django.conf import settings
 import subprocess
 from video_records.models import VideoRecord 
 from .serializers import VideoRecordSerializer
 import logging
+from .serializers import PerformanceSerializer
 from teams.models import Team, Player
 from .serializers import TeamSerializer, PlayerSerializer
 
@@ -148,3 +150,42 @@ class PlayerDetail(APIView):
             serializer = PlayerSerializer(player.first())
             return Response(serializer.data)
         return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class PerformanceListView(APIView):
+    def get(self, request):
+        # Get all performances
+        performances = Performance.objects.all()
+        serializer = PerformanceSerializer(performances, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = PerformanceSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PerformanceDetailView(APIView):
+    def get(self, request, player_id):
+        try:
+            # Get performances for the specified player
+            performances = Performance.objects.get(player_id=player_id)
+            serializer = PerformanceSerializer(performances)
+            return Response(serializer.data)
+        except Performance.DoesNotExist:
+            return Response({"detail": "No performances found for this player."}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request, player_id):
+        try:
+            # Get the performance for the specific player
+            performance = Performance.objects.get(player_id=player_id)
+            serializer = PerformanceSerializer(performance, data=request.data)
+
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Performance.DoesNotExist:
+            return Response({"detail": "Performance not found for this player."}, status=status.HTTP_404_NOT_FOUND)

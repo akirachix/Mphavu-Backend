@@ -2,6 +2,12 @@
 from rest_framework import serializers
 from video_records.models import VideoRecord
 from teams.models import Team, Player
+from performance.models import Performance  
+
+class PerformanceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Performance
+        fields = '__all__'
 class VideoRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = VideoRecord

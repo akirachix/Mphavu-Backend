@@ -1,5 +1,12 @@
+
 from rest_framework import serializers
+from video_records.models import VideoRecord
 from teams.models import Team, Player
+class VideoRecordSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoRecord
+        fields = ['player_id', 'video_description', 'video_file', 'shooting_accuracy', 'shooting_angle']
+    
 class PlayerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Player

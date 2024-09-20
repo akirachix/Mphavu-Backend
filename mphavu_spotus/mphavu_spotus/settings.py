@@ -41,10 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'video_records',
-    
-    
-    
-    
+    'teams',  
+    'api',
     
 ]
 

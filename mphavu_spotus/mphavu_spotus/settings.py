@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'video_records',
     'teams',  
     'api',
+    'performance',
+
     
 ]
 

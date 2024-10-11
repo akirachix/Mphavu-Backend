@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response 
 from rest_framework import status 
 import os
+from django.shortcuts import get_object_or_404
 from django.conf import settings
 import subprocess
 import cv2
@@ -11,11 +12,26 @@ from django.views.decorators.csrf import csrf_exempt
 from video_records.models import VideoRecord 
 from .serializers import VideoRecordSerializer
 import logging
+from .serializers import PerformanceSerializer
 from teams.models import Team, Player
 from .serializers import TeamSerializer, PlayerSerializer
 from django.http import HttpResponse
 from video_analysis.forms import VideoUploadForm
 from video_analysis.models import FootballVideo
+from api.serializers import LoginSerializer, RegisterSerializer, PlayerSerializer
+from django.shortcuts import get_object_or_404
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import authenticate
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User, Permission
+from emailsender.models import EmailInvite
+from emailsender.utils import send_invite
+from .serializers import EmailInviteSerializer
+from django.core.mail import send_mail
+
+
 
 logger = logging.getLogger(__name__)
 """
@@ -238,3 +254,175 @@ def analyze_video(video_path):
     shooting_angle = angle_sum / successful_shots if successful_shots > 0 else 0
 
     return shooting_accuracy, shooting_angle    
+
+
+class PerformanceListView(APIView):
+    def get(self, request):
+        # Get all performances
+        performances = Performance.objects.all()
+        serializer = PerformanceSerializer(performances, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = PerformanceSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PerformanceDetailView(APIView):
+    def get(self, request, player_id):
+        try:
+            # Get performances for the specified player
+            performances = Performance.objects.get(player_id=player_id)
+            serializer = PerformanceSerializer(performances)
+            return Response(serializer.data)
+        except Performance.DoesNotExist:
+            return Response({"detail": "No performances found for this player."}, status=status.HTTP_404_NOT_FOUND)
+
+    def put(self, request, player_id):
+        try:
+            # Get the performance for the specific player
+            performance = Performance.objects.get(player_id=player_id)
+            serializer = PerformanceSerializer(performance, data=request.data)
+
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Performance.DoesNotExist:
+            return Response({"detail": "Performance not found for this player."}, status=status.HTTP_404_NOT_FOUND)
+        
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            group_permissions = Permission.objects.filter(group__user=user).values_list('codename', flat=True)
+            user_permissions = user.user_permissions.values_list('codename', flat=True)
+            all_permissions = set(group_permissions) | set(user_permissions)
+            response_data = {
+                'message': f"{user.role.capitalize()} {user.first_name} {user.last_name} successfully created",
+                'user': {
+                    'first_name': user.first_name,
+                    'last_name': user.last_name,
+                    'email': user.email,
+                    'role': user.role,
+                }
+            }
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserDataMixin:
+    def get_user_data(self, user):
+        group_permissions = Permission.objects.filter(group__user=user).values_list('codename', flat=True)
+        user_permissions = user.user_permissions.values_list('codename', flat=True)
+        all_permissions = set(group_permissions)
+        all_permissions.update(user_permissions)
+        return {
+            'user_id': user.user_id,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            'role': user.role,
+        }
+
+class UserListView(UserDataMixin, APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        User = get_user_model()  # Use this to get the custom user model
+        users = User.objects.all()
+        user_data_list = [self.get_user_data(user) for user in users]
+        return Response(user_data_list)  
+    
+class LoginUser(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            password = serializer.validated_data['password']
+            user = authenticate(request, username=email, password=password)  # Adjust as needed
+
+            if user:
+                auth_login(request, user)
+                response_data = {
+                    'message': 'Login successful',
+                    'user': {
+                        'user_id': user.user_id,
+                        'first_name': user.first_name,
+                        'last_name': user.last_name,
+                        'email': user.email,
+                        'role': user.role,
+                    }
+                }
+                return Response(response_data, status=status.HTTP_200_OK)
+            return Response({'detail': 'Invalid credentials'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+# Handles listing and creating players
+class PlayerListView(APIView):
+    def get(self, request):
+        players = Player.objects.all()
+        serializer = PlayerSerializer(players, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = PlayerSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Handles retrieval, update, and deletion of a single player
+class PlayerDetailView(APIView):
+    def get(self, request, player_id):
+        player = get_object_or_404(Player, pk=player_id)
+        serializer = PlayerSerializer(player)
+        return Response(serializer.data)
+
+    def put(self, request, player_id):
+        player = get_object_or_404(Player, pk=player_id)
+        serializer = PlayerSerializer(player, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InviteView(APIView):
+    def post(self, request):
+        serializer = EmailInviteSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            try:
+                email_invite = serializer.save()
+                
+                send_invite(email)
+
+                return Response({"message": "Invitation sent!"}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+def send_invite(email):
+    send_mail(
+        'Invitation to Join SpotUs',
+        'Congratulations! You are invited to join SpotUs. Use this link to register. https://informational-website-sage.vercel.app/',
+        'mphavuspotus@gmail.com',
+        [email],
+        fail_silently=False,
+    )
+    

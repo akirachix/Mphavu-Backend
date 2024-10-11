@@ -8,14 +8,17 @@ from django.conf import settings
 import subprocess
 import cv2
 import numpy as np
+from .serializers import FootballVideoSerializer
+from rest_framework.decorators import api_view
 from django.views.decorators.csrf import csrf_exempt
+from performance.models import Performance
 from video_records.models import VideoRecord 
 from .serializers import VideoRecordSerializer
 import logging
 from .serializers import PerformanceSerializer
 from teams.models import Team, Player
 from .serializers import TeamSerializer, PlayerSerializer
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from video_analysis.forms import VideoUploadForm
 from video_analysis.models import FootballVideo
 from api.serializers import LoginSerializer, RegisterSerializer, PlayerSerializer
@@ -172,13 +175,13 @@ class PlayerDetail(APIView):
             return Response(serializer.data)
         return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
     
-@csrf_exempt
+@api_view(['POST'])
 def upload_video(request):
     if request.method == 'POST':
         form = VideoUploadForm(request.POST, request.FILES)
         if form.is_valid():
             video = form.save()
-           
+
             uploaded_video_path = video.video_file.path
             compressed_video_path = compress_video(uploaded_video_path)
             if compressed_video_path:
@@ -186,10 +189,19 @@ def upload_video(request):
                 video.shooting_accuracy = shooting_accuracy
                 video.shooting_angle = shooting_angle
                 video.save()
-                return HttpResponse(f"Shooting Accuracy: {shooting_accuracy:.2f}%, Shooting Angle: {shooting_angle:.2f}°")
-    else:
-        form = VideoUploadForm()
-    return render(request, 'upload.html', {'form': form})
+
+                # Use the serializer to include all fields in the response
+                serializer = FootballVideoSerializer(video)
+
+                # Create a response message indicating success
+                return Response({
+                    'message': 'Video uploaded and processed successfully.',
+                    'data': serializer.data
+                }, status=201)  # HTTP 201 Created
+
+        return Response({'error': 'Invalid form data'}, status=400)
+
+    return Response({'error': 'Invalid request method'}, status=405)
 
 def compress_video(video_path):
     compressed_video_path = os.path.splitext(video_path)[0] + '_compressed.mp4'

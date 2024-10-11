@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from users.models import User
 from players.models import Player
 from emailsender.models import EmailInvite
+from video_analysis.models import FootballVideo
 
 
 class PerformanceSerializer(serializers.ModelSerializer):
@@ -67,3 +68,8 @@ class EmailInviteSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailInvite
         fields = ['email']
+
+class FootballVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FootballVideo
+        fields = ['id', 'video_file', 'player_name', 'shooting_accuracy', 'shooting_angle', 'player_id']   

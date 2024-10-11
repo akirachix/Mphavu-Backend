@@ -1,14 +1,21 @@
+from django.shortcuts import render
 from rest_framework.views import APIView 
 from rest_framework.response import Response 
 from rest_framework import status 
 import os
 from django.conf import settings
 import subprocess
+import cv2
+import numpy as np
+from django.views.decorators.csrf import csrf_exempt
 from video_records.models import VideoRecord 
 from .serializers import VideoRecordSerializer
 import logging
 from teams.models import Team, Player
 from .serializers import TeamSerializer, PlayerSerializer
+from django.http import HttpResponse
+from video_analysis.forms import VideoUploadForm
+from video_analysis.models import FootballVideo
 
 logger = logging.getLogger(__name__)
 """
@@ -148,3 +155,98 @@ class PlayerDetail(APIView):
             serializer = PlayerSerializer(player.first())
             return Response(serializer.data)
         return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+@csrf_exempt
+def upload_video(request):
+    if request.method == 'POST':
+        form = VideoUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            video = form.save()
+           
+            uploaded_video_path = video.video_file.path
+            # Path for the compressed video
+            compressed_video_path = compress_video(uploaded_video_path)
+            if compressed_video_path:
+                # Analyze the compressed video and update the model with results
+                shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
+                video.shooting_accuracy = shooting_accuracy
+                video.shooting_angle = shooting_angle
+                video.save()
+                return HttpResponse(f"Shooting Accuracy: {shooting_accuracy:.2f}%, Shooting Angle: {shooting_angle:.2f}°")
+    else:
+        form = VideoUploadForm()
+    return render(request, 'upload.html', {'form': form})
+
+def compress_video(video_path):
+    compressed_video_path = os.path.splitext(video_path)[0] + '_compressed.mp4'
+    # FFmpeg command to compress the video
+    command = [
+        'ffmpeg',
+        '-i', video_path,
+        '-vcodec', 'libx264',    # Use H.264 codec for compression
+        '-crf', '28',            # Constant Rate Factor (lower means better quality)
+        '-preset', 'medium',      # Compression speed (ultrafast, superfast, veryfast, faster, fast, medium)
+        '-y',                     # Overwrite output file if it exists
+        compressed_video_path
+    ]
+    
+    try:
+        subprocess.run(command, check=True)
+        return compressed_video_path
+    except subprocess.CalledProcessError as e:
+        print(f"Error during compression: {e}")
+        return None
+
+def analyze_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+
+    total_frames = 0
+    successful_shots = 0
+    angle_sum = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        total_frames += 1
+
+        # Detect the ball
+        hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        # Define the color range for detecting the ball (this may need to be adjusted)
+        lower_color = np.array([20, 100, 100])  # Example for a yellow ball
+        upper_color = np.array([30, 255, 255])
+        
+        # Create a mask for the ball
+        mask = cv2.inRange(hsv_frame, lower_color, upper_color)
+        
+        # Find contours in the mask
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if contours:
+            # Assume the largest contour is the ball
+            largest_contour = max(contours, key=cv2.contourArea)
+            if cv2.contourArea(largest_contour) > 500:  # Threshold for valid detection
+                successful_shots += 1
+
+                # Calculate the shooting angle based on the ball's position
+                M = cv2.moments(largest_contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    
+                    # Calculate the angle based on the center of the frame
+                    center_x = frame.shape[1] // 2
+                    center_y = frame.shape[0] // 2
+                    angle = np.arctan2(cY - center_y, cX - center_x) * (180 / np.pi)
+                    angle_sum += abs(angle)
+
+    cap.release()
+
+    # Calculate shooting accuracy as the percentage of successful shots
+    shooting_accuracy = (successful_shots / total_frames) * 100 if total_frames > 0 else 0
+    # Calculate average shooting angle
+    shooting_angle = angle_sum / successful_shots if successful_shots > 0 else 0
+
+    return shooting_accuracy, shooting_angle    

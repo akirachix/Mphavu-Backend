@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'video_records',
     'teams',  
     'api',
-    
+    'video_analysis',
 ]
 
 MIDDLEWARE = [

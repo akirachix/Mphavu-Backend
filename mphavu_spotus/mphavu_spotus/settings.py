@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'users',
     'players',
     'emailsender',
+  
 
 
     
@@ -185,3 +186,4 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'mphavuspotus@gmail.com'
 EMAIL_HOST_PASSWORD = 'goeu hnjr dbeo xnau'
+

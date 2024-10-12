@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -55,7 +56,6 @@ INSTALLED_APPS = [
     
 ]
 
-
 AUTH_USER_MODEL = 'users.User'
 ASGI_APPLICATION = 'mphavuspotus.asgi.application'
 
@@ -64,10 +64,19 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+
 ]
+
+
+
+CORS_ALLOW_ALL_ORIGINS = True
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 ROOT_URLCONF = 'mphavu_spotus.urls'
 
@@ -93,12 +102,27 @@ WSGI_APPLICATION = 'mphavu_spotus.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL')
+    )
 }
+# Fallback for local development and test environments
+if not os.getenv('DATABASE_URL'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -151,7 +175,13 @@ ENV_FILE = find_dotenv()
 if ENV_FILE:
     load_dotenv(ENV_FILE)
 
-AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN")
-AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID")
-AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET")
+AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN","")
+AUTH0_CLIENT_ID = os.environ.get("AUTH0_CLIENT_ID","")
+AUTH0_CLIENT_SECRET = os.environ.get("AUTH0_CLIENT_SECRET","")
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'mphavuspotus@gmail.com'
+EMAIL_HOST_PASSWORD = 'goeu hnjr dbeo xnau'

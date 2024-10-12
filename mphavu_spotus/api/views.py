@@ -1,3 +1,4 @@
+from django.shortcuts import render
 from rest_framework.views import APIView 
 from rest_framework.response import Response 
 from rest_framework import status 
@@ -5,12 +6,21 @@ import os
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 import subprocess
+import cv2
+import numpy as np
+from .serializers import FootballVideoSerializer
+from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt
+from performance.models import Performance
 from video_records.models import VideoRecord 
 from .serializers import VideoRecordSerializer
 import logging
 from .serializers import PerformanceSerializer
 from teams.models import Team, Player
 from .serializers import TeamSerializer, PlayerSerializer
+from django.http import HttpResponse, JsonResponse
+from video_analysis.forms import VideoUploadForm
+from video_analysis.models import FootballVideo
 from api.serializers import LoginSerializer, RegisterSerializer, PlayerSerializer
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import login as auth_login
@@ -164,6 +174,104 @@ class PlayerDetail(APIView):
             serializer = PlayerSerializer(player.first())
             return Response(serializer.data)
         return Response({'error': 'Player not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+@api_view(['POST'])
+def upload_video(request):
+    if request.method == 'POST':
+        form = VideoUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            # Save the uploaded video
+            video = form.save()
+
+            uploaded_video_path = video.video_file.path
+            
+            # Compress the video
+            compressed_video_path = compress_video(uploaded_video_path)
+            if compressed_video_path:
+                # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
+                shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
+                
+                # Update the video instance with the analyzed values
+                video.shooting_accuracy = shooting_accuracy  # Ensure this is in percentage
+                video.shooting_angle = shooting_angle  # Ensure this is in degrees
+                video.save()
+
+                # Use the serializer to include all fields in the response
+                serializer = FootballVideoSerializer(video)
+
+                # Create a response message indicating success
+                return Response({
+                    'message': 'Video uploaded and processed successfully.',
+                    'data': serializer.data
+                }, status=201)  # HTTP 201 Created
+
+        return Response({'error': 'Invalid form data'}, status=400)
+
+    return Response({'error': 'Invalid request method'}, status=405)
+
+def compress_video(video_path):
+    compressed_video_path = os.path.splitext(video_path)[0] + '_compressed.mp4'
+    command = [
+        'ffmpeg',
+        '-i', video_path,
+        '-vcodec', 'libx264',    
+        '-crf', '28',            
+        '-preset', 'medium',      
+        '-y',                     
+        compressed_video_path
+    ]
+    
+    try:
+        subprocess.run(command, check=True)
+        return compressed_video_path
+    except subprocess.CalledProcessError as e:
+        print(f"Error during compression: {e}")
+        return None
+
+def analyze_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+
+    total_frames = 0
+    successful_shots = 0
+    angle_sum = 0
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        total_frames += 1
+
+        hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+        lower_color = np.array([20, 100, 100]) 
+        upper_color = np.array([30, 255, 255])
+        
+        mask = cv2.inRange(hsv_frame, lower_color, upper_color)
+        
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
+            if cv2.contourArea(largest_contour) > 500:  
+                successful_shots += 1
+
+                M = cv2.moments(largest_contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    
+                    center_x = frame.shape[1] // 2
+                    center_y = frame.shape[0] // 2
+                    angle = np.arctan2(cY - center_y, cX - center_x) * (180 / np.pi)
+                    angle_sum += abs(angle)
+
+    cap.release()
+
+    shooting_accuracy = (successful_shots / total_frames) * 100 if total_frames > 0 else 0
+    shooting_angle = angle_sum / successful_shots if successful_shots > 0 else 0
+
+    return shooting_accuracy, shooting_angle    
 
 
 class PerformanceListView(APIView):
@@ -336,3 +444,4 @@ def send_invite(email):
         fail_silently=False,
     )
     
+

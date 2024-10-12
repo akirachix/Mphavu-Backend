@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from users.models import User
 from players.models import Player
 from emailsender.models import EmailInvite
+from video_analysis.models import FootballVideo
 
 
 class PerformanceSerializer(serializers.ModelSerializer):
@@ -67,3 +68,14 @@ class EmailInviteSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailInvite
         fields = ['email']
+
+
+class FootballVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FootballVideo
+        fields = '__all__'
+
+    def validate_player_id(self, value):
+        if not Player.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Player with that ID does not exist.")
+        return value

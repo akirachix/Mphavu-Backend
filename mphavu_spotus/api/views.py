@@ -180,14 +180,20 @@ def upload_video(request):
     if request.method == 'POST':
         form = VideoUploadForm(request.POST, request.FILES)
         if form.is_valid():
+            # Save the uploaded video
             video = form.save()
 
             uploaded_video_path = video.video_file.path
+            
+            # Compress the video
             compressed_video_path = compress_video(uploaded_video_path)
             if compressed_video_path:
+                # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
                 shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
-                video.shooting_accuracy = shooting_accuracy
-                video.shooting_angle = shooting_angle
+                
+                # Update the video instance with the analyzed values
+                video.shooting_accuracy = shooting_accuracy  # Ensure this is in percentage
+                video.shooting_angle = shooting_angle  # Ensure this is in degrees
                 video.save()
 
                 # Use the serializer to include all fields in the response
@@ -438,3 +444,4 @@ def send_invite(email):
         fail_silently=False,
     )
     
+

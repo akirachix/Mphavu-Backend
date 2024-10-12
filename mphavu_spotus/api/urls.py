@@ -23,8 +23,7 @@ urlpatterns = [
    path('teams/<int:pk>/', TeamDetail.as_view(), name='team-detail'),
    path('teams/<int:team_id>/players/', PlayerListCreate.as_view(), name='player-list-create'),
    path('players/<int:pk>/', PlayerDetail.as_view(), name='player-detail'),
-   path('upload/', upload_video, name='upload_video'),
-   path('performance/', PerformanceListView.as_view(), name='performance-list'), 
+   path('player/upload/', upload_video, name='upload_video'),   path('performance/', PerformanceListView.as_view(), name='performance-list'), 
    path('players/<int:player_id>/performances/', PerformanceDetailView.as_view(), name='player-performance-list'),
    path('register/', RegisterView.as_view(), name='register'),  # Endpoint for user registration
    path('users/', UserListView.as_view(), name='all_users'),   # Endpoint to list all users

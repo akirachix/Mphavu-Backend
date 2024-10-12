@@ -69,7 +69,13 @@ class EmailInviteSerializer(serializers.ModelSerializer):
         model = EmailInvite
         fields = ['email']
 
+
 class FootballVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = FootballVideo
-        fields = ['id', 'video_file', 'player_name', 'shooting_accuracy', 'shooting_angle', 'player_id']   
+        fields = '__all__'
+
+    def validate_player_id(self, value):
+        if not Player.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Player with that ID does not exist.")
+        return value

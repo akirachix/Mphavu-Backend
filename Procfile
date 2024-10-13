@@ -1,1 +1,1 @@
-web: gunicorn spotus.wsgi --log-file -
+web: gunicorn mphavu_spotus.wsgi --log-file -

@@ -1,0 +1,1 @@
+web: gunicorn mphavu_spotus.wsgi --log-file -

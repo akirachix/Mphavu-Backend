@@ -2,20 +2,20 @@ from rest_framework.permissions import BasePermission, SAFE_METHODS
 class IsAuthenticatedAndHasPermission(BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.has_perm('Admin')
-class HasTotostepsPermissions(BasePermission):
+class HasSpotusPermissions(BasePermission):
     """
     Custom permission for admins.
     """
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:
             return True
-        totosteps_permissions = [
+        spotus_permissions = [
             'users.can_add_parent',
             'users.can_edit_questions',
             'users.can_view_parents',
             'users.can_view_children',
         ]
-        return any(request.user.has_perm(perm) for perm in totosteps_permissions)
+        return any(request.user.has_perm(perm) for perm in spotus_permissions)
 class HasParentPermissions(BasePermission):
     """
     Custom permission for parents.

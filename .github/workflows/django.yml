@@ -19,7 +19,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-glx  # Install the required library for OpenCV
+          sudo apt-get install -y libgl1-mesa-glx libsm6 libxext6 libxrender1  # Install required libraries for OpenCV
 
       - name: Install dependencies
         run: |
@@ -36,3 +36,4 @@ jobs:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: "sportus"
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
+

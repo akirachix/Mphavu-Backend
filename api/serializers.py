@@ -5,48 +5,55 @@ from teams.models import Team, Player
 from performance.models import Performance  
 from django.contrib.auth import get_user_model
 from users.models import User
-from players.models import Player
+# from players.models import Player
 from emailsender.models import EmailInvite
 from video_analysis.models import FootballVideo
-
+from performance.models import Performance
 
 class PerformanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Performance
         fields = '__all__'
+
+
 class VideoRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = VideoRecord
         fields = ['player_id', 'video_description', 'video_file', 'shooting_accuracy', 'shooting_angle']
     
-class PlayerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Player
-        fields = ['id', 'first_name', 'last_name', 'profile_picture', 'position', 'date_of_birth', 'team']
 class TeamSerializer(serializers.ModelSerializer):
-    players = PlayerSerializer(many=True, read_only=True)
     class Meta:
         model = Team
-        fields = ['id', 'name', 'sport', 'number_of_players', 'logo', 'players']
+        fields = '__all__'
+
+class PlayersSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Player
+        fields = '__all__'
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = '__all__'
-User = get_user_model()
+        fields = ['email', 'first_name', 'last_name', 'role', 'registered_from', 'profile_picture', 'location']
+
+    def create(self, validated_data):
+        return User.objects.create(**validated_data)
+
+
 class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
     class Meta:
         model = User
-        fields = ['email', 'password', 'role']
-        extra_kwargs = {
-            'password': {'write_only': True}
-        }
+        fields = ['email', 'first_name', 'last_name', 'password', 'role']
     def create(self, validated_data):
-        password = validated_data.pop('password', None)
-        user = User(**validated_data)
-        if password:
-            user.set_password(password)
+        user = User(
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            role=validated_data.get('role', User.COACH)  # Default role
+        )
+        user.set_password(validated_data['password'])
         user.save()
         return user
  
@@ -54,10 +61,7 @@ class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
     password = serializers.CharField(required=True)
     
-class PlayerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Player
-        fields = '__all__'      
+     
 class NormalizedChoiceField(serializers.ChoiceField):
     def to_internal_value(self, data):
         # Normalize the input to lowercase
@@ -70,6 +74,14 @@ class EmailInviteSerializer(serializers.ModelSerializer):
         fields = ['email']
 
 
+class CoachSerializer(UserSerializer):
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields
+
+
+class AgentSerializer(UserSerializer):
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields
 class FootballVideoSerializer(serializers.ModelSerializer):
     class Meta:
         model = FootballVideo

@@ -37,7 +37,6 @@ from django.core.mail import send_mail
 from teams.models import Team, Player
 from .serializers import TeamSerializer, PlayersSerializer, UserSerializer
 
-# Team Views
 class TeamListView(APIView):
     """
     Handles listing all teams and creating a new team.
@@ -186,41 +185,191 @@ class TeamPlayersDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-# Upload and Analyze Video
-# Upload and Analyze Video
-@api_view(['POST'])
-def upload_video(request):
-    if request.method == 'POST':
-        form = VideoUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            # Save the uploaded video
-            video = form.save()
-            uploaded_video_path = video.video_file.path
+# # Upload and Analyze Video
+# # Upload and Analyze Video
+# @api_view(['POST'])
+# def upload_video(request):
+#     if request.method == 'POST':
+#         form = VideoUploadForm(request.POST, request.FILES)
+#         if form.is_valid():
+#             # Save the uploaded video
+#             video = form.save()
+#             uploaded_video_path = video.video_file.path
             
-            # Compress the video
-            compressed_video_path = compress_video(uploaded_video_path)
-            if compressed_video_path:
-                # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
-                shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
+#             # Compress the video
+#             compressed_video_path = compress_video(uploaded_video_path)
+#             if compressed_video_path:
+#                 # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
+#                 shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
                 
-                # Update the video instance with the analyzed values
-                video.shooting_accuracy = shooting_accuracy
-                video.shooting_angle = shooting_angle
-                video.save()
+#                 # Update the video instance with the analyzed values
+#                 video.shooting_accuracy = shooting_accuracy
+#                 video.shooting_angle = shooting_angle
+#                 video.save()
 
-                # Use the serializer to include all fields in the response
-                serializer = FootballVideoSerializer(video)
+#                 # Use the serializer to include all fields in the response
+#                 serializer = FootballVideoSerializer(video)
 
-                return Response({
-                    'message': 'Video uploaded and processed successfully.',
-                    'data': serializer.data
-                }, status=status.HTTP_201_CREATED)
+#                 return Response({
+#                     'message': 'Video uploaded and processed successfully.',
+#                     'data': serializer.data
+#                 }, status=status.HTTP_201_CREATED)
 
-        return Response({'error': 'Invalid form data'}, status=status.HTTP_400_BAD_REQUEST)
+#         return Response({'error': 'Invalid form data'}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({'error': 'Invalid request method'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+#     return Response({'error': 'Invalid request method'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
-# Helper function to compress video
+# # Helper function to compress video
+# def compress_video(video_path):
+#     compressed_video_path = os.path.splitext(video_path)[0] + '_compressed.mp4'
+#     command = [
+#         'ffmpeg',
+#         '-i', video_path,
+#         '-vcodec', 'libx264',    
+#         '-crf', '28',            
+#         '-preset', 'medium',      
+#         '-y',                     
+#         compressed_video_path
+#     ]
+    
+#     try:
+#         subprocess.run(command, check=True)
+#         return compressed_video_path
+#     except subprocess.CalledProcessError as e:
+#         print(f"Error during compression: {e}")
+#         return None
+
+# # Helper function to analyze video
+# def analyze_video(video_path):
+#     cap = cv2.VideoCapture(video_path)
+
+#     total_frames = 0
+#     successful_shots = 0
+#     angle_sum = 0
+
+#     while cap.isOpened():
+#         ret, frame = cap.read()
+#         if not ret:
+#             break
+
+#         total_frames += 1
+
+#         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+#         lower_color = np.array([20, 100, 100]) 
+#         upper_color = np.array([30, 255, 255])
+        
+#         mask = cv2.inRange(hsv_frame, lower_color, upper_color)
+#         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+#         if contours:
+#             largest_contour = max(contours, key=cv2.contourArea)
+#             if cv2.contourArea(largest_contour) > 500:  
+#                 successful_shots += 1
+
+#                 M = cv2.moments(largest_contour)
+#                 if M["m00"] != 0:
+#                     cX = int(M["m10"] / M["m00"])
+#                     cY = int(M["m01"] / M["m00"])
+                    
+#                     center_x = frame.shape[1] // 2
+#                     center_y = frame.shape[0] // 2
+#                     angle = np.arctan2(cY - center_y, cX - center_x) * (180 / np.pi)
+#                     angle_sum += abs(angle)
+
+#     cap.release()
+
+#     shooting_accuracy = (successful_shots / total_frames) * 100 if total_frames > 0 else 0
+#     shooting_angle = angle_sum / successful_shots if successful_shots > 0 else 0
+
+#     return shooting_accuracy, shooting_angle
+
+# # List all analyzed videos
+# class FootballVideoListView(APIView):
+#     def get(self, request):
+#         videos = FootballVideo.objects.all()
+#         serializer = FootballVideoSerializer(videos, many=True)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#     def post(self, request):
+#         # Assuming you have a form or serializer for the video upload
+#         form = VideoUploadForm(request.POST, request.FILES)
+#         if form.is_valid():
+#             video = form.save()
+
+#             uploaded_video_path = video.video_file.path
+            
+#             # Compress the video
+#             compressed_video_path = compress_video(uploaded_video_path)
+#             if compressed_video_path:
+#                 # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
+#                 shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
+                
+#                 # Update the video instance with the analyzed values
+#                 video.shooting_accuracy = shooting_accuracy  # Ensure this is in percentage
+#                 video.shooting_angle = shooting_angle  # Ensure this is in degrees
+#                 video.save()
+
+#                 # Use the serializer to include all fields in the response
+#                 serializer = FootballVideoSerializer(video)
+
+#                 return Response({
+#                     'message': 'Video uploaded and processed successfully.',
+#                     'data': serializer.data
+#                 }, status=status.HTTP_201_CREATED)
+
+#         return Response({'error': 'Invalid form data'}, status=status.HTTP_400_BAD_REQUEST)
+
+# # Retrieve specific analyzed video by video ID
+# class FootballVideoDetailView(APIView):
+#     def get(self, request, video_id):
+#         video = get_object_or_404(FootballVideo, id=video_id)
+#         serializer = FootballVideoSerializer(video)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+# # List all analyzed videos for a specific player
+# class PlayerFootballVideoListView(APIView):
+#     def get(self, request, player_id):
+#         videos = FootballVideo.objects.filter(player_id=player_id)  # Filter videos by player_id
+#         serializer = FootballVideoSerializer(videos, many=True)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#     def post(self, request, player_id):
+#         # Here you can handle video upload for a specific player
+#         form = VideoUploadForm(request.POST, request.FILES)
+#         if form.is_valid():
+#             video = form.save(commit=False)  # Don't save yet
+#             video.player_id = player_id  # Set the player_id
+#             video.save()  # Now save the instance
+
+#             # Process the video as before (compress, analyze, etc.)
+#             uploaded_video_path = video.video_file.path
+#             compressed_video_path = compress_video(uploaded_video_path)
+#             if compressed_video_path:
+#                 shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
+#                 video.shooting_accuracy = shooting_accuracy
+#                 video.shooting_angle = shooting_angle
+#                 video.save()
+
+#                 serializer = FootballVideoSerializer(video)
+#                 return Response({
+#                     'message': 'Video uploaded and processed successfully.',
+#                     'data': serializer.data
+#                 }, status=status.HTTP_201_CREATED)
+
+#         return Response({'error': 'Invalid form data'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# # Retrieve a specific analyzed video of a player
+# class PlayerFootballVideoDetailView(APIView):
+#     def get(self, request, player_id, video_id):
+#         try:
+#             # Query the video by both player_id and video_id
+#             video = FootballVideo.objects.get(player_id=player_id, id=video_id)
+#             serializer = FootballVideoSerializer(video)
+#             return Response(serializer.data, status=status.HTTP_200_OK)
+#         except FootballVideo.DoesNotExist:
+#             return Response({'error': 'Video not found for this player'}, status=status.HTTP_404_NOT_FOUND)
+
 def compress_video(video_path):
     compressed_video_path = os.path.splitext(video_path)[0] + '_compressed.mp4'
     command = [
@@ -284,6 +433,47 @@ def analyze_video(video_path):
 
     return shooting_accuracy, shooting_angle
 
+# Utility function to process video
+def process_video(video):
+    uploaded_video_path = video.video_file.path
+    
+    # Compress the video
+    compressed_video_path = compress_video(uploaded_video_path)
+    if compressed_video_path:
+        # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
+        shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
+        
+        # Update the video instance with the analyzed values
+        video.shooting_accuracy = shooting_accuracy
+        video.shooting_angle = shooting_angle
+        video.save()
+        
+        return True
+    return False
+
+# Video upload endpoint
+@api_view(['POST'])
+def upload_video(request):
+    if request.method == 'POST':
+        form = VideoUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            # Save the uploaded video
+            video = form.save()
+
+            # Process the video (compress and analyze)
+            if process_video(video):
+                # Use the serializer to include all fields in the response
+                serializer = FootballVideoSerializer(video)
+
+                return Response({
+                    'message': 'Video uploaded and processed successfully.',
+                    'data': serializer.data
+                }, status=status.HTTP_201_CREATED)
+
+        return Response({'error': 'Invalid form data'}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({'error': 'Invalid request method'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
 # List all analyzed videos
 class FootballVideoListView(APIView):
     def get(self, request):
@@ -292,27 +482,12 @@ class FootballVideoListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        # Assuming you have a form or serializer for the video upload
         form = VideoUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            video = form.save()
-
-            uploaded_video_path = video.video_file.path
-            
-            # Compress the video
-            compressed_video_path = compress_video(uploaded_video_path)
-            if compressed_video_path:
-                # Analyze the video and get shooting accuracy (in percentage) and shooting angle (in degrees)
-                shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
-                
-                # Update the video instance with the analyzed values
-                video.shooting_accuracy = shooting_accuracy  # Ensure this is in percentage
-                video.shooting_angle = shooting_angle  # Ensure this is in degrees
-                video.save()
-
-                # Use the serializer to include all fields in the response
+            video = form.save(commit=False)  # Don't save yet
+            # Process the video (compress and analyze)
+            if process_video(video):
                 serializer = FootballVideoSerializer(video)
-
                 return Response({
                     'message': 'Video uploaded and processed successfully.',
                     'data': serializer.data
@@ -335,22 +510,12 @@ class PlayerFootballVideoListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, player_id):
-        # Here you can handle video upload for a specific player
         form = VideoUploadForm(request.POST, request.FILES)
         if form.is_valid():
             video = form.save(commit=False)  # Don't save yet
             video.player_id = player_id  # Set the player_id
-            video.save()  # Now save the instance
-
-            # Process the video as before (compress, analyze, etc.)
-            uploaded_video_path = video.video_file.path
-            compressed_video_path = compress_video(uploaded_video_path)
-            if compressed_video_path:
-                shooting_accuracy, shooting_angle = analyze_video(compressed_video_path)
-                video.shooting_accuracy = shooting_accuracy
-                video.shooting_angle = shooting_angle
-                video.save()
-
+            # Process the video (compress and analyze)
+            if process_video(video):
                 serializer = FootballVideoSerializer(video)
                 return Response({
                     'message': 'Video uploaded and processed successfully.',
@@ -358,7 +523,6 @@ class PlayerFootballVideoListView(APIView):
                 }, status=status.HTTP_201_CREATED)
 
         return Response({'error': 'Invalid form data'}, status=status.HTTP_400_BAD_REQUEST)
-
 
 # Retrieve a specific analyzed video of a player
 class PlayerFootballVideoDetailView(APIView):
@@ -370,8 +534,6 @@ class PlayerFootballVideoDetailView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except FootballVideo.DoesNotExist:
             return Response({'error': 'Video not found for this player'}, status=status.HTTP_404_NOT_FOUND)
-
-
 logger = logging.getLogger(__name__)
 """
 Handle GET requests to retrieve a list of video records.

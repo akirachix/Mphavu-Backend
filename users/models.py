@@ -19,41 +19,50 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
+    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
+    location = models.CharField(max_length=100, blank=True, null=True)
+
     AGENT = 'agent'
     COACH = 'coach'
+    ADMIN = 'admin'
     ROLE_CHOICES = [
         (AGENT, 'Agent'),
         (COACH, 'Coach'),
+        (ADMIN, 'Admin'),  # Adding admin as a role
+    ]
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=COACH)
+    email = models.EmailField(unique=True)
+
+    user_id = models.AutoField(primary_key=True)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=100)
+
+    REGISTERED_VIA_CHOICES = [
+        ('admin', 'Admin Dashboard'),
+        ('coach', 'Coach API'),
+        ('agent', 'Agent API'),
+        ('other', 'Other'),
     ]
     
-    user_id = models.AutoField(primary_key=True)
-    first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    password = models.CharField(max_length=100)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
-    is_superuser = models.BooleanField(default=False)
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default=COACH)
-    is_staff = models.BooleanField(default=True)
-    
+    registered_from = models.CharField(max_length=10, choices=REGISTERED_VIA_CHOICES, default='other')
+
     objects = UserManager()
-    
+
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = [] 
+    REQUIRED_FIELDS = ['first_name', 'last_name']
     
     def __str__(self):
         return self.email
-    
+
     def clean(self):
-        if self.role == 'admin' and not self.is_superuser:
+        if self.role == self.ADMIN and not self.is_superuser:
             raise ValidationError(_('Admin role can only be assigned to superusers.'))
-        if self.is_superuser and self.role != 'admin':
+        if self.is_superuser and self.role != self.ADMIN:
             raise ValidationError(_('Superusers must have the admin role.'))
 
     @property
     def is_admin(self):
-        return self.role == 'admin'
+        return self.role == self.ADMIN
 
     @property
     def is_agent(self):
